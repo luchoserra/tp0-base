@@ -10,7 +10,6 @@ def generate_server():
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
-      - LOGGING_LEVEL=DEBUG
     networks:
       - testing_net
     volumes:
@@ -28,7 +27,6 @@ def generate_client(i):
     entrypoint: /client
     environment:
       - CLI_ID={i}
-      - CLI_LOG_LEVEL=DEBUG
     networks:
       - testing_net
     depends_on:
