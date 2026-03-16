@@ -64,8 +64,6 @@ def main():
         print("Error: number_of_clients must be an integer")
         sys.exit(1)
 
-    print(f"Generating compose in '{archivo}' with {clientes} clients")
-
     with open(archivo, "w") as f:
         f.write("name: tp0\n")
         f.write("services:\n")
