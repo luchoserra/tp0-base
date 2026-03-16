@@ -211,3 +211,10 @@ Donde:
 
 **Detalles de implementación:**
 La lógica de generación del archivo docker-compose se implementó mediante un script en Python que construye la estructura YAML correspondiente a los servicios y la red utilizada por el sistema.
+
+### Ejercicio 2:
+
+La manera de ejecutar este ejercicio es igual a la del [Ejercicio 1](#ejercicio-1).
+
+**Detalles de implementación:**
+Se configuraron volúmenes de Docker para montar los archivos de configuración desde el host hacia los contenedores, permitiendo modificar la configuración sin volver a construir las imágenes.
