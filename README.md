@@ -218,3 +218,18 @@ La manera de ejecutar este ejercicio es igual a la del [Ejercicio 1](#ejercicio-
 
 **Detalles de implementación:**
 Se configuraron volúmenes de Docker para montar los archivos de configuración desde el host hacia los contenedores, permitiendo modificar la configuración sin volver a construir las imágenes.
+
+### Ejercicio 3:
+
+Para ejecutar este ejercicio, se debe ejecutar el siguiente comando:
+
+```bash
+./validar-echo-server.sh
+```
+
+**Prerequisitos:**
+
+- El sistema debe estar ejecutándose con `make docker-compose-up`
+
+**Detalles de implementación:**
+Se implementó un script que utiliza un contenedor temporal con `netcat` para conectarse al servidor a través de la red interna de Docker, enviando un mensaje de prueba y verificando que el servidor responda con el mismo mensaje.
