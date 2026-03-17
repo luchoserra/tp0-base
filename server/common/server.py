@@ -31,7 +31,7 @@ class Server:
                 break
 
         self._server_socket.close()
-        logging.info("action: shutdown | result: success | source: server")
+        logging.info("action: shutdown | result: success")
 
     def __handle_client_connection(self, client_sock):
         """
@@ -69,6 +69,6 @@ class Server:
         return c
 
     def _handle_sigterm(self, signum, frame):
-        logging.info("action: shutdown | result: in_progress | source: server")
+        logging.info("action: shutdown | result: in_progress")
         self._running = False
         self._server_socket.close()

@@ -61,19 +61,6 @@ func (c *Client) StartClientLoop() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM)
 
-	done := make(chan struct{})
-
-	go func() {
-		<-sigChan
-		log.Infof("action: shutdown | result: in_progress | source: client")
-
-		if c.conn != nil {
-			c.conn.Close()
-		}
-
-		close(done)
-	}()
-
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
 		// Create the connection the server in every loop iteration. Send an
 		c.createClientSocket()
@@ -101,12 +88,12 @@ func (c *Client) StartClientLoop() {
 			msg,
 		)
 
-		// Wait a time between sending one message and the next one
 		select {
-			case <-sigChan:
-				log.Infof("action: shutdown | result: success | source: client")
-				return
 			case <-time.After(c.config.LoopPeriod):
+			case <-sigChan:
+				log.Infof("action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received", c.config.ID)
+				log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
+				return
 		}
 
 	}
