@@ -233,3 +233,10 @@ Para ejecutar este ejercicio, se debe ejecutar el siguiente comando:
 
 **Detalles de implementación:**
 Se implementó un script que utiliza un contenedor temporal con `netcat` para conectarse al servidor a través de la red interna de Docker, enviando un mensaje de prueba y verificando que el servidor responda con el mismo mensaje.
+
+### Ejercicio 4:
+
+Para ejecutar este ejercicio no hay ninguna forma especial de hacerlo.
+
+**Detalles de implementación:**
+Se implementó el handler de la señal SIGTERM en el cliente y servidor para finalizar gracefully. Por otro lado, se pusieron logs que muestran el progreso de la liberacion de cada recurso.
