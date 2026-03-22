@@ -12,9 +12,11 @@ OPCODE_LEN = 1
 
 class Protocol:
     def __init__(self, sock):
+        """Initialize the Protocol with a socket-like object."""
         self.sock = sock
 
     def _recv_all(self, length):
+        """Read exactly `length` bytes from the socket and return them as bytes"""
         data = b""
         while len(data) < length:
             chunk = self.sock.recv(length - len(data))
@@ -24,6 +26,7 @@ class Protocol:
         return data
 
     def receive(self):
+        """Receive a single framed packet and return its opcode and payload as a tuple."""
         opcode_bytes = self._recv_all(OPCODE_LEN)
         opcode = opcode_bytes[0]
 
@@ -38,6 +41,7 @@ class Protocol:
         return opcode, payload
 
     def send(self, opcode: int, message: str = ""):
+        """Send a framed packet with the given opcode and UTF-8 payload."""
         data = message.encode("utf-8")
 
         header = len(data).to_bytes(HEADER_LEN, "big")
@@ -45,28 +49,30 @@ class Protocol:
         packet = bytes([opcode]) + header + data
         self.sock.sendall(packet)
 
-    def receive_message(self):
+    def receive_message(self) -> Bet:
+        """Receive a Bet message (expects opcode OP_BET), parse it and returns it"""
         opcode, payload = self.receive()
 
-        if opcode == OP_BET:
-            fields = payload.split(DELIMITER)
-            return ("BET", self._parse_bet(fields))
-
-        else:
+        if opcode != OP_BET:
             raise ValueError("unknown opcode")
 
+        fields = payload.split(DELIMITER)
+        return self._parse_bet(fields)
+
     def send_ok(self):
+        """Send an OP_OK packet (empty payload)."""
         self.send(OP_OK)
 
     def send_error(self, msg: str):
+        """Send an OP_ERR packet with the provided error message as payload."""
         self.send(OP_ERR, msg)
 
     def _parse_bet(self, fields) -> Bet:
+        """Parse a list of fields into a Bet object and returns it."""
         if len(fields) != 6:
             raise ValueError("invalid bet format")
 
         agency, nombre, apellido, dni, nacimiento, numero = fields
-        print(fields)
         return Bet(
             agency,
             nombre,

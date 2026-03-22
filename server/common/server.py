@@ -45,18 +45,15 @@ class Server:
         protocol = Protocol(client_sock)
 
         try:
-            msg_type, data = protocol.receive_message()
+            bet = protocol.receive_message()
 
-            if msg_type == "BET":
-                bet = data
+            store_bets([bet])
 
-                store_bets([bet])
+            logging.info(
+                f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}"
+            )
 
-                logging.info(
-                    f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}"
-                )
-
-                protocol.send_ok()
+            protocol.send_ok()
 
         except Exception as e:
             logging.error(f"action: receive_message | result: fail | error: {e}")

@@ -22,10 +22,13 @@ type Protocol struct {
 	conn net.Conn
 }
 
+// NewProtocol returns a new Protocol that wraps the given network connection.
 func NewProtocol(conn net.Conn) *Protocol {
 	return &Protocol{conn: conn}
 }
 
+// Sends a framed packet to the Server.
+// Returns an error if any write fails.
 func (p *Protocol) send(opcode byte, message string) error {
 	data := []byte(message)
 
@@ -47,6 +50,7 @@ func (p *Protocol) send(opcode byte, message string) error {
 	return nil
 }
 
+// recvAll reads exactly length bytes from the Server, returning the data it read.
 func (p *Protocol) recvAll(length int) ([]byte, error) {
 	data := make([]byte, length)
 	total := 0
@@ -62,6 +66,8 @@ func (p *Protocol) recvAll(length int) ([]byte, error) {
 	return data, nil
 }
 
+// receive reads a single framed packet from the Server.
+// It returns the opcode, payload string and an error if one occurred.
 func (p *Protocol) receive() (byte, string, error) {
 
 	opcodeBytes, err := p.recvAll(OpcodeLen)
@@ -86,6 +92,7 @@ func (p *Protocol) receive() (byte, string, error) {
 	return opcode, string(payload), nil
 }
 
+// SendBet builds a bet payload from the provided fields and sends it using the OpBet opcode.
 func (p *Protocol) SendBet(
 	agency string,
 	nombre string,
@@ -101,6 +108,7 @@ func (p *Protocol) SendBet(
 	return p.send(OpBet, payload)
 }
 
+// ReceiveResponse receives a response packet and interprets it.
 func (p *Protocol) ReceiveResponse() error {
 
 	opcode, payload, err := p.receive()

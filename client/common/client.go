@@ -56,66 +56,74 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
+func (c *Client) sendBet() error {
+	if err := c.createClientSocket(); err != nil {
+		return err
+	}
+	defer c.conn.Close()
+
+	protocol := NewProtocol(c.conn)
+
+	err := protocol.SendBet(
+		c.config.ID,
+		c.config.Name,
+		c.config.Surname,
+		c.config.DocumentNumber,
+		c.config.Birthdate,
+		c.config.Number,
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := protocol.ReceiveResponse(); err != nil {
+		return err
+	}
+
+	log.Infof(
+		"action: apuesta_enviada | result: success | dni: %v | numero: %v",
+		c.config.DocumentNumber,
+		c.config.Number,
+	)
+
+	return nil
+}
+
 func (c *Client) StartClientLoop() {
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM)
 
 	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-		// Create the connection the server in every loop iteration. Send an
-		c.createClientSocket()
 
-		// TODO: Modify the send to avoid short-write
-		protocol := NewProtocol(c.conn)
-
-		err := protocol.SendBet(
-			c.config.ID,
-			c.config.Name,
-			c.config.Surname,
-			c.config.DocumentNumber,
-			c.config.Birthdate,
-			c.config.Number,
-		)
-
+		err := c.sendBet()
 		if err != nil {
 			log.Errorf(
 				"action: send_bet | result: fail | client_id: %v | error: %v",
 				c.config.ID,
 				err,
 			)
-			c.conn.Close()
 			return
 		}
-
-		err = protocol.ReceiveResponse()
-		c.conn.Close()
-
-		if err != nil {
-			log.Errorf(
-				"action: receive_response | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
-
-		log.Infof(
-			"action: apuesta_enviada | result: success | dni: %v | numero: %v",
-			c.config.DocumentNumber,
-			c.config.Number,
-		)
 
 		select {
 		case <-time.After(c.config.LoopPeriod):
+
 		case <-sigChan:
-			log.Infof("action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received", c.config.ID)
-			log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
+			log.Infof(
+				"action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received",
+				c.config.ID,
+			)
+			log.Infof(
+				"action: shutdown | result: success | client_id: %v",
+				c.config.ID,
+			)
 			return
 		}
-
 	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+
+	log.Infof(
+		"action: loop_finished | result: success | client_id: %v",
+		c.config.ID,
+	)
 }
