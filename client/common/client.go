@@ -1,13 +1,11 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
 	"net"
-	"time"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/op/go-logging"
 )
@@ -16,10 +14,15 @@ var log = logging.MustGetLogger("log")
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID            string
-	ServerAddress string
-	LoopAmount    int
-	LoopPeriod    time.Duration
+	ID             string
+	ServerAddress  string
+	LoopAmount     int
+	LoopPeriod     time.Duration
+	Name           string
+	Surname        string
+	DocumentNumber string
+	Birthdate      string
+	Number         string
 }
 
 // Client Entity that encapsulates how
@@ -66,34 +69,51 @@ func (c *Client) StartClientLoop() {
 		c.createClientSocket()
 
 		// TODO: Modify the send to avoid short-write
-		fmt.Fprintf(
-			c.conn,
-			"[CLIENT %v] Message N°%v\n",
+		protocol := NewProtocol(c.conn)
+
+		err := protocol.SendBet(
 			c.config.ID,
-			msgID,
+			c.config.Name,
+			c.config.Surname,
+			c.config.DocumentNumber,
+			c.config.Birthdate,
+			c.config.Number,
 		)
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
+
+		if err != nil {
+			log.Errorf(
+				"action: send_bet | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			c.conn.Close()
+			return
+		}
+
+		err = protocol.ReceiveResponse()
 		c.conn.Close()
 
 		if err != nil {
-			log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+			log.Errorf(
+				"action: receive_response | result: fail | client_id: %v | error: %v",
 				c.config.ID,
 				err,
 			)
 			return
 		}
 
-		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-			c.config.ID,
-			msg,
+		log.Infof(
+			"action: apuesta_enviada | result: success | dni: %v | numero: %v",
+			c.config.DocumentNumber,
+			c.config.Number,
 		)
 
 		select {
-			case <-time.After(c.config.LoopPeriod):
-			case <-sigChan:
-				log.Infof("action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received", c.config.ID)
-				log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
-				return
+		case <-time.After(c.config.LoopPeriod):
+		case <-sigChan:
+			log.Infof("action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received", c.config.ID)
+			log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
+			return
 		}
 
 	}
