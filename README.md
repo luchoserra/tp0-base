@@ -240,3 +240,35 @@ Para ejecutar este ejercicio no hay ninguna forma especial de hacerlo.
 
 **Detalles de implementación:**
 Se implementó el handler de la señal SIGTERM en el cliente y servidor para finalizar gracefully. Por otro lado, se pusieron logs que muestran el progreso de la liberacion de cada recurso.
+
+### Ejercicio 5:
+
+Para ejecutar este ejercicio hace falta levantar todos los servicios y visualizar los logs con los siguientes comandos:
+
+```bash
+make docker-compose-up
+```
+
+y
+
+```bash
+make docker-compose-logs
+```
+
+**Detalles de implementación:**
+Se implementó un protocolo simple para la comunicación entre cliente y servidor.
+Cada mensaje enviado sigue el siguiente formato:
+
+![Estructura del paquete](docs/protocol_packet.svg)
+
+- OPCODE: identifica el tipo de mensaje.
+- LENGTH: tamaño del payload en bytes.
+- PAYLOAD: contenido del mensaje.
+
+Códigos de operación:
+
+| Opcode | Significado                 |
+| ------ | --------------------------- |
+| 0      | OK — respuesta del servidor |
+| 1      | BET — envío de apuesta      |
+| 2      | ERROR — respuesta de error  |

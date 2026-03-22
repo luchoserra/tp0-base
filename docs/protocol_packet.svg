@@ -1,0 +1,29 @@
+<svg width="680" height="160" viewBox="0 0 680 160" xmlns="http://www.w3.org/2000/svg" style="background:#0d1117;border-radius:8px">
+  <defs>
+    <style>
+      .label { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 15px; font-weight: 600; fill: #e6edf3; }
+      .sub   { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; font-weight: 400; fill: #8b949e; }
+      .opval { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; fill: #8b949e; }
+    </style>
+  </defs>
+
+  <!-- opcode box -->
+  <rect x="40" y="30" width="110" height="64" rx="8" fill="#3d1f1a" stroke="#b85c3a" stroke-width="1.2"/>
+  <text class="label" x="95" y="59" text-anchor="middle" dominant-baseline="central">opcode</text>
+  <text class="sub"   x="95" y="78" text-anchor="middle" dominant-baseline="central">1 byte</text>
+
+  <!-- length box -->
+  <rect x="162" y="30" width="170" height="64" rx="8" fill="#1a2a3d" stroke="#3a7bd5" stroke-width="1.2"/>
+  <text class="label" x="247" y="59" text-anchor="middle" dominant-baseline="central">length</text>
+  <text class="sub"   x="247" y="78" text-anchor="middle" dominant-baseline="central">4 bytes</text>
+
+  <!-- payload box -->
+  <rect x="344" y="30" width="296" height="64" rx="8" fill="#1a3030" stroke="#2a8a6e" stroke-width="1.2"/>
+  <text class="label" x="492" y="59" text-anchor="middle" dominant-baseline="central">payload</text>
+  <text class="sub"   x="492" y="78" text-anchor="middle" dominant-baseline="central">N bytes</text>
+
+  <!-- opcode values -->
+  <text class="opval" x="40" y="118">0 = OK</text>
+  <text class="opval" x="40" y="133">1 = Bet</text>
+  <text class="opval" x="40" y="148">2 = Err</text>
+</svg>
