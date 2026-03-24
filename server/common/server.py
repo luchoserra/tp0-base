@@ -2,7 +2,7 @@ import socket
 import logging
 import signal
 from .protocol import Protocol
-from .utils import store_bets
+from .utils import Bet, store_bets
 
 
 class Server:
@@ -45,8 +45,8 @@ class Server:
         protocol = Protocol(client_sock)
 
         try:
-            bet = protocol.receive_message()
-
+            payload = protocol.receive_message()
+            bet = Bet(*payload)
             store_bets([bet])
 
             logging.info(

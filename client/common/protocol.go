@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/binary"
-	"errors"
 	"net"
 	"strings"
 )
@@ -10,7 +9,6 @@ import (
 const (
 	OpOK  byte = 0
 	OpBet byte = 1
-	OpErr byte = 2
 
 	OpcodeLen = 1
 	HeaderLen = 4
@@ -108,23 +106,3 @@ func (p *Protocol) SendBet(
 	return p.send(OpBet, payload)
 }
 
-// ReceiveResponse receives a response packet and interprets it.
-func (p *Protocol) ReceiveResponse() error {
-
-	opcode, payload, err := p.receive()
-	if err != nil {
-		return err
-	}
-
-	switch opcode {
-
-	case OpOK:
-		return nil
-
-	case OpErr:
-		return errors.New(payload)
-
-	default:
-		return errors.New("unknown opcode")
-	}
-}

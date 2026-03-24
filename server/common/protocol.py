@@ -1,10 +1,7 @@
-from .utils import Bet
-
 DELIMITER = ","
 
 OP_OK = 0
 OP_BET = 1
-OP_ERR = 2
 
 HEADER_LEN = 4
 OPCODE_LEN = 1
@@ -49,7 +46,7 @@ class Protocol:
         packet = bytes([opcode]) + header + data
         self.sock.sendall(packet)
 
-    def receive_message(self) -> Bet:
+    def receive_message(self):
         """Receive a Bet message (expects opcode OP_BET), parse it and returns it"""
         opcode, payload = self.receive()
 
@@ -57,27 +54,8 @@ class Protocol:
             raise ValueError("unknown opcode")
 
         fields = payload.split(DELIMITER)
-        return self._parse_bet(fields)
+        return tuple(fields)
 
     def send_ok(self):
         """Send an OP_OK packet (empty payload)."""
         self.send(OP_OK)
-
-    def send_error(self, msg: str):
-        """Send an OP_ERR packet with the provided error message as payload."""
-        self.send(OP_ERR, msg)
-
-    def _parse_bet(self, fields) -> Bet:
-        """Parse a list of fields into a Bet object and returns it."""
-        if len(fields) != 6:
-            raise ValueError("invalid bet format")
-
-        agency, nombre, apellido, dni, nacimiento, numero = fields
-        return Bet(
-            agency,
-            nombre,
-            apellido,
-            dni,
-            nacimiento,
-            numero,
-        )

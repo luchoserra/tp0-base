@@ -80,8 +80,9 @@ func (c *Client) sendBet() error {
 	if err != nil {
 		return err
 	}
+	_, _, err = protocol.receive()
 
-	if err := protocol.ReceiveResponse(); err != nil {
+	if err != nil {
 		return err
 	}
 
