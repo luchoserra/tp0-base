@@ -6,6 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"bufio"
+	"fmt"
 
 	"github.com/op/go-logging"
 )
@@ -18,11 +20,8 @@ type ClientConfig struct {
 	ServerAddress  string
 	LoopAmount     int
 	LoopPeriod     time.Duration
-	Name           string
-	Surname        string
-	DocumentNumber string
-	Birthdate      string
-	Number         string
+	MaxAmount      int
+
 }
 
 // Client Entity that encapsulates how
@@ -60,8 +59,8 @@ func (c *Client) createClientSocket() error {
 	log.Criticalf("action: connect | result: fail | client_id: %v | error: %v", c.config.ID, err)
 	return err
 }
+func (c *Client) sendBatch(batch []string) error {
 
-func (c *Client) sendBet() error {
 	if err := c.createClientSocket(); err != nil {
 		return err
 	}
@@ -69,28 +68,19 @@ func (c *Client) sendBet() error {
 
 	protocol := NewProtocol(c.conn)
 
-	err := protocol.SendBet(
-		c.config.ID,
-		c.config.Name,
-		c.config.Surname,
-		c.config.DocumentNumber,
-		c.config.Birthdate,
-		c.config.Number,
-	)
+	err := protocol.SendBatch(batch)
 	if err != nil {
 		return err
 	}
-	_, _, err = protocol.receive()
+	opcode, _, err := protocol.receive()
 
 	if err != nil {
 		return err
 	}
 
-	log.Infof(
-		"action: apuesta_enviada | result: success | dni: %v | numero: %v",
-		c.config.DocumentNumber,
-		c.config.Number,
-	)
+	if opcode != OpOK {
+		return fmt.Errorf("server responded with error")
+	}
 
 	return nil
 }
@@ -100,21 +90,26 @@ func (c *Client) StartClientLoop() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM)
 
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
+	filename := fmt.Sprintf(".data/agency-%s.csv", c.config.ID)
 
-		err := c.sendBet()
-		if err != nil {
-			log.Errorf(
-				"action: send_bet | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Errorf(
+			"action: open_file | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	batch := []string{}
+
+	for scanner.Scan() {
 
 		select {
-		case <-time.After(c.config.LoopPeriod):
-
 		case <-sigChan:
 			log.Infof(
 				"action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received",
@@ -123,6 +118,38 @@ func (c *Client) StartClientLoop() {
 			log.Infof(
 				"action: shutdown | result: success | client_id: %v",
 				c.config.ID,
+			)
+			return
+		default:
+		}
+
+		line := scanner.Text()
+		bet := fmt.Sprintf("%s,%s", c.config.ID, line)
+		batch = append(batch, bet)
+
+		if len(batch) == c.config.MaxAmount {
+
+			err := c.sendBatch(batch)
+			if err != nil {
+				log.Errorf(
+					"action: send_batch | result: fail | client_id: %v | error: %v",
+					c.config.ID,
+					err,
+				)
+				return
+			}
+
+			batch = batch[:0]
+		}
+	}
+
+	if len(batch) > 0 {
+		err := c.sendBatch(batch)
+		if err != nil {
+			log.Errorf(
+				"action: send_batch | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
 			)
 			return
 		}

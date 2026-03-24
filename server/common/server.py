@@ -1,7 +1,7 @@
 import socket
 import logging
 import signal
-from .protocol import Protocol
+from .protocol import Protocol, OP_OK, OP_ERR
 from .utils import Bet, store_bets
 
 
@@ -36,31 +36,31 @@ class Server:
         logging.info("action: shutdown | result: success")
 
     def __handle_client_connection(self, client_sock):
-        """
-        Read message from a specific client socket and closes the socket
 
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
-        """
         protocol = Protocol(client_sock)
 
         try:
             payload = protocol.receive_message()
-            bet = Bet(*payload)
-            store_bets([bet])
+            batch = [Bet(*item) for item in payload]
+
+            store_bets(batch)
 
             logging.info(
-                f"action: apuesta_almacenada | result: success | dni: {bet.document} | numero: {bet.number}"
+                f"action: apuesta_recibida | result: success | cantidad: {len(batch)}"
             )
 
-            protocol.send_ok()
+            protocol.send(OP_OK)
 
         except Exception as e:
-            logging.error(f"action: receive_message | result: fail | error: {e}")
+
+            logging.error(
+                f"action: apuesta_recibida | result: fail | cantidad: {len(batch)} | error: {e}"
+            )
             try:
-                protocol.send_error(str(e))
+                protocol.send(OP_ERR, str(e))
             except Exception:
                 pass
+
         finally:
             client_sock.close()
 

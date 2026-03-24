@@ -1,7 +1,9 @@
 DELIMITER = ","
+BET_SEPARATOR = "\n"
 
 OP_OK = 0
 OP_BET = 1
+OP_ERR = 2
 
 HEADER_LEN = 4
 OPCODE_LEN = 1
@@ -47,15 +49,18 @@ class Protocol:
         self.sock.sendall(packet)
 
     def receive_message(self):
-        """Receive a Bet message (expects opcode OP_BET), parse it and returns it"""
+        """Receive a batch of bets and return them as a list of Bet objects"""
         opcode, payload = self.receive()
 
         if opcode != OP_BET:
             raise ValueError("unknown opcode")
 
-        fields = payload.split(DELIMITER)
-        return tuple(fields)
+        bets = []
 
-    def send_ok(self):
-        """Send an OP_OK packet (empty payload)."""
-        self.send(OP_OK)
+        lines = payload.strip().split(BET_SEPARATOR)
+
+        for line in lines:
+            bet = line.split(DELIMITER)
+            bets.append(bet)
+
+        return bets

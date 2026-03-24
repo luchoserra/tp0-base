@@ -9,11 +9,13 @@ import (
 const (
 	OpOK  byte = 0
 	OpBet byte = 1
+	OpErr byte = 2
 
 	OpcodeLen = 1
 	HeaderLen = 4
 
-	Delimiter = ","
+	Delimiter   = ","
+	BetSeparator = "\n"
 )
 
 type Protocol struct {
@@ -106,3 +108,9 @@ func (p *Protocol) SendBet(
 	return p.send(OpBet, payload)
 }
 
+func (p *Protocol) SendBatch(bets []string) error {
+
+	payload := strings.Join(bets, BetSeparator)
+
+	return p.send(OpBet, payload)
+}
