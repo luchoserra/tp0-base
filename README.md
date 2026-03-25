@@ -329,3 +329,24 @@ La cantidad máxima de apuestas por batch se configuró con la clave `batch.maxA
 
 Eso da aproximadamente 74 bytes por apuesta, lo que permite hasta aproximadamente 110 apuestas en
 8kB. Se fijó el valor por defecto en **100** para mantener un margen de seguridad.
+
+### Ejercicio 7:
+
+Este ejercicio se ejecuta de igual manera que los anteriores.
+
+**Detalles de implementación:**
+
+Se extendió el protocolo con dos nuevos códigos de operación:
+
+| Opcode | Significado                                               |
+| ------ | --------------------------------------------------------- |
+| 3      | DONE — el cliente notifica que terminó de enviar apuestas |
+| 4      | WINNERS — el servidor responde con los DNIs ganadores     |
+
+Una vez enviadas todas las apuestas, el cliente cierra esa conexión y abre una nueva.
+Envía un mensaje `OP_DONE` con su ID de agencia y queda bloqueado esperando la respuesta.
+Cuando el servidor responde con `OP_WINNERS`, el cliente extrae los DNIs ganadores y los loguea.
+
+El servidor, al recibir un mensaje `OP_DONE`, guarda la conexión abierta en un diccionario. Cuando las 5 agencias han notificado, ejecuta el sorteo yenvia a cada una sus ganadores a través de la conexión que fue mantenida abierta.
+
+Los ganadores se eligen cargando todas las apuestas con `load_bets()` una única vez (materializada en una lista para evitar el agotamiento del generador) y aplicando `has_won()` sobre cada apuesta para cada agencia.
