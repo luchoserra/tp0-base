@@ -59,6 +59,7 @@ func (c *Client) createClientSocket() error {
 	log.Criticalf("action: connect | result: fail | client_id: %v | error: %v", c.config.ID, err)
 	return err
 }
+// Sends a single batch of bets over the given protocol and waits for an OpOK message.
 func (c *Client) sendBatch(protocol *Protocol, batch []string) error {
 	if err := protocol.SendBatch(batch); err != nil {
 		return err
