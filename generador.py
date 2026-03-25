@@ -1,15 +1,16 @@
 import sys
 
 
-def generate_server():
+def generate_server(clientes):
     """Generate the YAML configuration for the server container."""
 
-    return """  server:
+    return f"""  server:
     container_name: server
     image: server:latest
     entrypoint: python3 /main.py
     environment:
       - PYTHONUNBUFFERED=1
+      - CLIENT_AMOUNT={clientes}
     networks:
       - testing_net
     volumes:
@@ -71,7 +72,7 @@ def main():
         f.write("name: tp0\n")
         f.write("services:\n")
 
-        f.write(generate_server())
+        f.write(generate_server(clientes))
 
         for i in range(1, clientes + 1):
             f.write(generate_client(i))

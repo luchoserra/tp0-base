@@ -7,14 +7,17 @@ import (
 )
 
 const (
-	OpOK  byte = 0
-	OpBet byte = 1
-	OpErr byte = 2
+	OpOK      byte = 0
+	OpBet     byte = 1
+	OpErr     byte = 2
+	OpDone    byte = 3
+	OpWinners byte = 4
+	OpNotReady byte = 5
 
 	OpcodeLen = 1
 	HeaderLen = 4
 
-	Delimiter   = ","
+	Delimiter    = ","
 	BetSeparator = "\n"
 )
 
@@ -108,9 +111,15 @@ func (p *Protocol) SendBet(
 	return p.send(OpBet, payload)
 }
 
+// SendBatch joins the given bet strings with BetSeparator and sends them as a single OpBet packet.
 func (p *Protocol) SendBatch(bets []string) error {
 
 	payload := strings.Join(bets, BetSeparator)
 
 	return p.send(OpBet, payload)
+}
+
+// SendWinnersQuery sends an OpWinners packet with the given agency ID.
+func (p *Protocol) SendWinnersQuery(agency string) error {
+	return p.send(OpWinners, agency)
 }

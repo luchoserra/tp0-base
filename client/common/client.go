@@ -1,13 +1,14 @@
 package common
 
 import (
+	"bufio"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
-	"bufio"
-	"fmt"
 
 	"github.com/op/go-logging"
 )
@@ -16,12 +17,11 @@ var log = logging.MustGetLogger("log")
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID             string
-	ServerAddress  string
-	LoopAmount     int
-	LoopPeriod     time.Duration
-	MaxAmount      int
-
+	ID            string
+	ServerAddress string
+	LoopAmount    int
+	LoopPeriod    time.Duration
+	MaxAmount     int
 }
 
 // Client Entity that encapsulates how
@@ -77,23 +77,40 @@ func (c *Client) sendBatch(protocol *Protocol, batch []string) error {
 	return nil
 }
 
-func (c *Client) sendAllBets(protocol *Protocol, scanner *bufio.Scanner, sigChan <-chan os.Signal) error {
+func (c *Client) sendAllBets(sigChan <-chan os.Signal) error {
+	filename := fmt.Sprintf(".data/agency-%s.csv", c.config.ID)
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Errorf("action: open_file | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return err
+	}
+	defer file.Close()
+
+	if err := c.createClientSocket(); err != nil {
+		return err
+	}
+	defer c.conn.Close()
+
+	protocol := NewProtocol(c.conn)
+	scanner := bufio.NewScanner(file)
 	batch := []string{}
 
 	for scanner.Scan() {
 		select {
 		case <-sigChan:
-			log.Infof("action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received", c.config.ID)
+			log.Infof("action: shutdown | result: in_progress | client_id: %v", c.config.ID)
 			log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
-			return nil
+			return fmt.Errorf("SIGTERM received")
 		default:
 		}
 
-		bet := fmt.Sprintf("%s,%s", c.config.ID, scanner.Text())
+		line := scanner.Text()
+		bet := fmt.Sprintf("%s,%s", c.config.ID, line)
 		batch = append(batch, bet)
 
 		if len(batch) == c.config.MaxAmount {
 			if err := c.sendBatch(protocol, batch); err != nil {
+				log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v", c.config.ID, err)
 				return err
 			}
 			batch = batch[:0]
@@ -101,32 +118,87 @@ func (c *Client) sendAllBets(protocol *Protocol, scanner *bufio.Scanner, sigChan
 	}
 
 	if len(batch) > 0 {
-		return c.sendBatch(protocol, batch)
+		if err := c.sendBatch(protocol, batch); err != nil {
+			log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v", c.config.ID, err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) notifyDone() error {
+	if err := c.createClientSocket(); err != nil {
+		return err
+	}
+	defer c.conn.Close()
+
+	protocol := NewProtocol(c.conn)
+	if err := protocol.send(OpDone, c.config.ID); err != nil {
+		return err
+	}
+
+	opcode, _, err := protocol.receive()
+	if err != nil {
+		return err
+	}
+	if opcode != OpOK {
+		return fmt.Errorf("unexpected opcode: %d", opcode)
 	}
 	return nil
+}
+
+func (c *Client) queryWinners() error {
+	for {
+		if err := c.createClientSocket(); err != nil {
+			return err
+		}
+
+		protocol := NewProtocol(c.conn)
+		if err := protocol.SendWinnersQuery(c.config.ID); err != nil {
+			c.conn.Close()
+			return err
+		}
+
+		opcode, payload, err := protocol.receive()
+		c.conn.Close()
+		if err != nil {
+			return err
+		}
+
+		if opcode == OpNotReady {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		if opcode != OpWinners {
+			return fmt.Errorf("unexpected opcode: %d", opcode)
+		}
+
+		winners := strings.Split(payload, Delimiter)
+		if payload == "" {
+			winners = []string{}
+		}
+		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
+		return nil
+	}
 }
 
 func (c *Client) StartClientLoop() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM)
 
-	file, err := os.Open(fmt.Sprintf(".data/agency-%s.csv", c.config.ID))
-	if err != nil {
-		log.Errorf("action: open_file | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		return
-	}
-	defer file.Close()
-
-	if err := c.createClientSocket(); err != nil {
-		return
-	}
-	defer c.conn.Close()
-
-	protocol := NewProtocol(c.conn)
-	if err := c.sendAllBets(protocol, bufio.NewScanner(file), sigChan); err != nil {
-		log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v", c.config.ID, err)
+	if err := c.sendAllBets(sigChan); err != nil {
+		log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		return
 	}
 
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
+	if err := c.notifyDone(); err != nil {
+		log.Errorf("action: notify_done | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return
+	}
+
+	if err := c.queryWinners(); err != nil {
+		log.Errorf("action: consulta_ganadores | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return
+	}
 }
