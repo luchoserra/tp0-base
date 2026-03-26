@@ -59,7 +59,7 @@ func (c *Client) createClientSocket() error {
 	log.Criticalf("action: connect | result: fail | client_id: %v | error: %v", c.config.ID, err)
 	return err
 }
-// Sends a single batch of bets over the given protocol and waits for an OpOK message.
+
 func (c *Client) sendBatch(protocol *Protocol, batch []string) error {
 	if err := protocol.SendBatch(batch); err != nil {
 		return err
@@ -121,7 +121,7 @@ func (c *Client) sendAllBets(sigChan <-chan os.Signal, protocol *Protocol) error
 	return nil
 }
 
-func (c *Client) notifyDone(protocol *Protocol) error {
+func (c *Client) notifyDoneAndQueryWinners(protocol *Protocol) error {
 	if err := protocol.send(OpDone, c.config.ID); err != nil {
 		return err
 	}
@@ -133,42 +133,25 @@ func (c *Client) notifyDone(protocol *Protocol) error {
 	if opcode != OpOK {
 		return fmt.Errorf("unexpected opcode after OP_DONE: %d", opcode)
 	}
-	return nil
-}
 
-func (c *Client) queryWinners() error {
-	for {
-		if err := c.createClientSocket(); err != nil {
-			return err
-		}
-
-		protocol := NewProtocol(c.conn)
-		if err := protocol.SendWinnersQuery(c.config.ID); err != nil {
-			c.conn.Close()
-			return err
-		}
-
-		opcode, payload, err := protocol.receive()
-		c.conn.Close()
-		if err != nil {
-			return err
-		}
-
-		if opcode == OpNotReady {
-			time.Sleep(2 * time.Second)
-			continue
-		}
-		if opcode != OpWinners {
-			return fmt.Errorf("unexpected opcode: %d", opcode)
-		}
-
-		winners := strings.Split(payload, Delimiter)
-		if payload == "" {
-			winners = []string{}
-		}
-		log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
-		return nil
+	if err := protocol.SendWinnersQuery(c.config.ID); err != nil {
+		return err
 	}
+
+	opcode, payload, err := protocol.receive()
+	if err != nil {
+		return err
+	}
+	if opcode != OpWinners {
+		return fmt.Errorf("unexpected opcode: %d", opcode)
+	}
+
+	winners := strings.Split(payload, Delimiter)
+	if payload == "" {
+		winners = []string{}
+	}
+	log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %v", len(winners))
+	return nil
 }
 
 func (c *Client) StartClientLoop() {
@@ -188,12 +171,7 @@ func (c *Client) StartClientLoop() {
 		return
 	}
 
-	if err := c.notifyDone(protocol); err != nil {
-		log.Errorf("action: notify_done | result: fail | client_id: %v | error: %v", c.config.ID, err)
-		return
-	}
-
-	if err := c.queryWinners(); err != nil {
+	if err := c.notifyDoneAndQueryWinners(protocol); err != nil {
 		log.Errorf("action: consulta_ganadores | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		return
 	}

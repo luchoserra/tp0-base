@@ -2,6 +2,7 @@ import socket
 import logging
 import signal
 import os
+import threading
 from .protocol import (
     Protocol,
     OP_OK,
@@ -9,7 +10,6 @@ from .protocol import (
     OP_BET,
     OP_DONE,
     OP_WINNERS,
-    OP_NOT_READY,
     DELIMITER,
     BET_SEPARATOR,
 )
@@ -24,33 +24,39 @@ class Server:
         self._running = True
         signal.signal(signal.SIGTERM, self._handle_sigterm)
 
-        self._done_agencies = set()
-        self._total_agencies = int(os.getenv("CLIENT_AMOUNT", "5"))
-        self._winners_cache = None
+        total_agencies = int(os.getenv("CLIENT_AMOUNT", "5"))
+        self._barrier = threading.Barrier(total_agencies)
+        self._bets_lock = threading.Lock()
 
     def run(self):
         """
         Main server loop.
-        Accepts new connections sequentially and handles each one until the client
-        finishes communicating.
-        """
 
+        Accepts new connections and spawns a thread to handle each one in parallel.
+        Stops when a SIGTERM is received or the socket is closed.
+        """
+        threads = []
         while self._running:
             try:
                 client_sock = self.__accept_new_connection()
-                self.__handle_client_connection(client_sock)
+                t = threading.Thread(
+                    target=self.__handle_client_connection, args=(client_sock,)
+                )
+                t.start()
+                threads.append(t)
             except OSError:
                 break
+
+        for t in threads:
+            t.join()
 
         self._server_socket.close()
         logging.info("action: shutdown | result: success")
 
     def __handle_client_connection(self, client_sock):
         """
-        Handle a single client connection in a loop until the client finishes sending bets
-        and notifies the server with OP_DONE.
+        Handle a single client connection, processing different client opcodes in a loop.
         """
-
         protocol = Protocol(client_sock)
 
         try:
@@ -64,7 +70,6 @@ class Server:
                     self._handle_bets(protocol, payload)
                 elif opcode == OP_DONE:
                     self._handle_done(protocol, payload)
-                    return
                 elif opcode == OP_WINNERS:
                     self._handle_winners_query(protocol, payload)
                     return
@@ -82,7 +87,8 @@ class Server:
         try:
             lines = payload.strip().split(BET_SEPARATOR)
             batch = [Bet(*line.split(DELIMITER)) for line in lines]
-            store_bets(batch)
+            with self._bets_lock:
+                store_bets(batch)
             logging.info(
                 f"action: apuesta_recibida | result: success | cantidad: {len(batch)}"
             )
@@ -94,31 +100,35 @@ class Server:
             protocol.send(OP_ERR, str(e))
 
     def _handle_done(self, protocol, payload):
-        """Register the agency as done sending bets and acknowledge."""
+        """
+        Handles the agency's OP_DONE and wait at the barrier until all agencies are done.
+        """
         agency = payload
-        self._done_agencies.add(agency)
-        logging.info(
-            f"action: agency_done | result: success | agency: {agency} | total: {len(self._done_agencies)}"
-        )
+        logging.info(f"action: agency_done | result: success | agency: {agency}")
         protocol.send(OP_OK)
 
-    def _handle_winners_query(self, protocol, payload):
-        """Respond with winners if all agencies are done, otherwise respond with OP_NOT_READY."""
-        agency = payload
-
-        if len(self._done_agencies) < self._total_agencies:
-            protocol.send(OP_NOT_READY)
-            return
-
-        if self._winners_cache is None:
+        idx = self._barrier.wait()
+        if idx == 0:
             logging.info("action: sorteo | result: success")
-            self._winners_cache = {}
-            for bet in load_bets():
-                if has_won(bet):
-                    self._winners_cache.setdefault(str(bet.agency), []).append(bet.document)
 
-        winners = self._winners_cache.get(agency, [])
-        protocol.send(OP_WINNERS, DELIMITER.join(winners))
+    def _handle_winners_query(self, protocol, payload):
+        """
+        Respond to a winners query from a client.
+        """
+        agency = payload
+        winners = [
+            bet.document
+            for bet in load_bets()
+            if has_won(bet) and bet.agency == int(agency)
+        ]
+        try:
+            protocol.send(OP_WINNERS, DELIMITER.join(winners))
+        except Exception as e:
+            logging.error(
+                f"action: send_winners | result: fail | agency: {agency} | error: {e}"
+            )
+        finally:
+            protocol.sock.close()
 
     def __accept_new_connection(self):
         """
