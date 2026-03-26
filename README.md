@@ -321,3 +321,19 @@ Cuando el servidor responde con `OP_WINNERS`, el cliente extrae los DNIs ganador
 El servidor, al recibir un mensaje `OP_DONE`, guarda la conexión abierta en un diccionario. Cuando las 5 agencias han notificado, ejecuta el sorteo yenvia a cada una sus ganadores a través de la conexión que fue mantenida abierta.
 
 Los ganadores se eligen cargando todas las apuestas con `load_bets()` una única vez y aplicando `has_won()` sobre cada apuesta para cada agencia.
+
+### Ejercicio 8:
+
+Este ejercicio se ejecuta de igual manera que los anteriores.
+
+**Detalles de implementación:**
+
+El servidor fue modificado para aceptar conexiones en paralelo. Por cada nueva conexión aceptada se lanza un `Thread` que ejecuta el handler correspondiente, permitiendo atender a múltiples agencias simultáneamente.
+
+Para garantizar la correcta sincronización se utilizaron dos herramientas de concurrencia:
+
+- **`threading.Lock`:** protege las escrituras realizadas por `store_bets(...)`. Sin este lock, dos threads podrían escribir al archivo de apuestas concurrentemente y corromper los datos.
+
+- **`threading.Barrier`:** Cada thread que recibe un mensaje de finalizacion de envio de apuestas (`OP_DONE`), llama al metodo `wait()` de la barrera y queda bloqueado hasta que las `N` agencias configuradas hayan notificado su fin. Al cumplirse esa condicion, se libera la barrera y se realiza el sorteo para continuar con laejecucion.
+
+La cantidad de agencias esperadas se configura mediante la variable de entorno `CLIENT_AMOUNT`, cuyo valor por defecto es `5`.
