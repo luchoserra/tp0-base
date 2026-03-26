@@ -301,35 +301,6 @@ La cantidad máxima de apuestas por batch se configuró con la clave `batch.maxA
 Eso da aproximadamente 74 bytes por apuesta, lo que permite hasta aproximadamente 110 apuestas en
 8kB. Se fijó el valor por defecto en **100** para mantener un margen de seguridad.
 
-### Ejercicio 6:
-
-Este ejercicio se ejecuta de igual manera que los anteriores.
-
-**Detalles de implementación:**
-
-Se modificó el protocolo para soportar el envío de múltiples apuestas en un mismo mensaje (batch). El payload ahora contiene las apuestas separadas por `\n`, donde cada apuesta sigue el formato `agencia,nombre,apellido,dni,nacimiento,numero`.
-
-Se agregó el código de operación `OP_ERR = 2` al protocolo para que el servidor pueda notificar al cliente cuando el procesamiento de un batch falla.
-
-El generador de compose fue actualizado para montar el volumen `.data` en cada cliente, permitiendo inyectar los archivos de apuestas en los containers sin reconstruir las imágenes.
-
-La cantidad máxima de apuestas por batch se configuró con la clave `batch.maxAmount` en `config.yaml`. El valor por defecto se calculó para que los paquetes no superen los 8kB:
-| Campo | Tamaño (bytes) |
-|------------------------|----------------|
-| Nombre | 20 |
-| Apellido | 20 |
-| DNI | 8 |
-| Fecha de nacimiento | 10 |
-| Agencia | 1 |
-| Número | 4 |
-| Comas separadoras | 5 |
-| Separador `\n` | 1 |
-| **Total por apuesta** | **69** |
-| Header del paquete | 5 |
-
-Eso da aproximadamente 74 bytes por apuesta, lo que permite hasta aproximadamente 110 apuestas en
-8kB. Se fijó el valor por defecto en **100** para mantener un margen de seguridad.
-
 ### Ejercicio 7:
 
 Este ejercicio se ejecuta de igual manera que los anteriores.
@@ -349,4 +320,4 @@ Cuando el servidor responde con `OP_WINNERS`, el cliente extrae los DNIs ganador
 
 El servidor, al recibir un mensaje `OP_DONE`, guarda la conexión abierta en un diccionario. Cuando las 5 agencias han notificado, ejecuta el sorteo yenvia a cada una sus ganadores a través de la conexión que fue mantenida abierta.
 
-Los ganadores se eligen cargando todas las apuestas con `load_bets()` una única vez (materializada en una lista para evitar el agotamiento del generador) y aplicando `has_won()` sobre cada apuesta para cada agencia.
+Los ganadores se eligen cargando todas las apuestas con `load_bets()` una única vez y aplicando `has_won()` sobre cada apuesta para cada agencia.
