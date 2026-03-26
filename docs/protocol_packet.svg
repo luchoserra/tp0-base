@@ -25,5 +25,4 @@
   <!-- opcode values -->
   <text class="opval" x="40" y="118">0 = OK</text>
   <text class="opval" x="40" y="133">1 = Bet</text>
-  <text class="opval" x="40" y="148">2 = Err</text>
 </svg>

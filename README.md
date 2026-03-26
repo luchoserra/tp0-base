@@ -271,4 +271,3 @@ Códigos de operación:
 | ------ | --------------------------- |
 | 0      | OK — respuesta del servidor |
 | 1      | BET — envío de apuesta      |
-| 2      | ERROR — respuesta de error  |
