@@ -52,28 +52,19 @@ func (c *Client) createClientSocket() error {
 			c.conn = conn
 			return nil
 		}
-		log.Infof("action: connect | result: retry | attempt: %d | error: %v", i+1, err)
+		log.Infof("action: connect | result: in_progress | attempt: %d | error: %v", i+1, err)
 		time.Sleep(2 * time.Second)
 	}
 
 	log.Criticalf("action: connect | result: fail | client_id: %v | error: %v", c.config.ID, err)
 	return err
 }
-func (c *Client) sendBatch(batch []string) error {
-
-	if err := c.createClientSocket(); err != nil {
+func (c *Client) sendBatch(protocol *Protocol, batch []string) error {
+	if err := protocol.SendBatch(batch); err != nil {
 		return err
 	}
-	defer c.conn.Close()
 
-	protocol := NewProtocol(c.conn)
-
-	err := protocol.SendBatch(batch)
-	if err != nil {
-		return err
-	}
 	opcode, _, err := protocol.receive()
-
 	if err != nil {
 		return err
 	}
@@ -85,78 +76,56 @@ func (c *Client) sendBatch(batch []string) error {
 	return nil
 }
 
-func (c *Client) StartClientLoop() {
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM)
-
-	filename := fmt.Sprintf(".data/agency-%s.csv", c.config.ID)
-
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Errorf(
-			"action: open_file | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
+func (c *Client) sendAllBets(protocol *Protocol, scanner *bufio.Scanner, sigChan <-chan os.Signal) error {
 	batch := []string{}
 
 	for scanner.Scan() {
-
 		select {
 		case <-sigChan:
-			log.Infof(
-				"action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received",
-				c.config.ID,
-			)
-			log.Infof(
-				"action: shutdown | result: success | client_id: %v",
-				c.config.ID,
-			)
-			return
+			log.Infof("action: shutdown | result: in_progress | client_id: %v | msg: SIGTERM received", c.config.ID)
+			log.Infof("action: shutdown | result: success | client_id: %v", c.config.ID)
+			return nil
 		default:
 		}
 
-		line := scanner.Text()
-		bet := fmt.Sprintf("%s,%s", c.config.ID, line)
+		bet := fmt.Sprintf("%s,%s", c.config.ID, scanner.Text())
 		batch = append(batch, bet)
 
 		if len(batch) == c.config.MaxAmount {
-
-			err := c.sendBatch(batch)
-			if err != nil {
-				log.Errorf(
-					"action: send_batch | result: fail | client_id: %v | error: %v",
-					c.config.ID,
-					err,
-				)
-				return
+			if err := c.sendBatch(protocol, batch); err != nil {
+				return err
 			}
-
 			batch = batch[:0]
 		}
 	}
 
 	if len(batch) > 0 {
-		err := c.sendBatch(batch)
-		if err != nil {
-			log.Errorf(
-				"action: send_batch | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
+		return c.sendBatch(protocol, batch)
+	}
+	return nil
+}
+
+func (c *Client) StartClientLoop() {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM)
+
+	file, err := os.Open(fmt.Sprintf(".data/agency-%s.csv", c.config.ID))
+	if err != nil {
+		log.Errorf("action: open_file | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return
+	}
+	defer file.Close()
+
+	if err := c.createClientSocket(); err != nil {
+		return
+	}
+	defer c.conn.Close()
+
+	protocol := NewProtocol(c.conn)
+	if err := c.sendAllBets(protocol, bufio.NewScanner(file), sigChan); err != nil {
+		log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return
 	}
 
-	log.Infof(
-		"action: loop_finished | result: success | client_id: %v",
-		c.config.ID,
-	)
+	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
 }

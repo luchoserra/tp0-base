@@ -40,27 +40,25 @@ class Server:
         protocol = Protocol(client_sock)
 
         try:
-            payload = protocol.receive_message()
-            batch = [Bet(*item) for item in payload]
+            while True:
+                try:
+                    payload = protocol.receive_message()
+                except ConnectionError:
+                    break
 
-            store_bets(batch)
-
-            logging.info(
-                f"action: apuesta_recibida | result: success | cantidad: {len(batch)}"
-            )
-
-            protocol.send(OP_OK)
-
-        except Exception as e:
-
-            logging.error(
-                f"action: apuesta_recibida | result: fail | cantidad: {len(batch)} | error: {e}"
-            )
-            try:
-                protocol.send(OP_ERR, str(e))
-            except Exception:
-                pass
-
+                batch = []
+                try:
+                    batch = [Bet(*item) for item in payload]
+                    store_bets(batch)
+                    logging.info(
+                        f"action: apuesta_recibida | result: success | cantidad: {len(batch)}"
+                    )
+                    protocol.send(OP_OK)
+                except Exception as e:
+                    logging.error(
+                        f"action: apuesta_recibida | result: fail | cantidad: {len(batch)} | error: {e}"
+                    )
+                    protocol.send(OP_ERR, str(e))
         finally:
             client_sock.close()
 
