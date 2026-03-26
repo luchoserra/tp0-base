@@ -77,7 +77,7 @@ func (c *Client) sendBatch(protocol *Protocol, batch []string) error {
 	return nil
 }
 
-func (c *Client) sendAllBets(sigChan <-chan os.Signal) error {
+func (c *Client) sendAllBets(sigChan <-chan os.Signal, protocol *Protocol) error {
 	filename := fmt.Sprintf(".data/agency-%s.csv", c.config.ID)
 	file, err := os.Open(filename)
 	if err != nil {
@@ -86,12 +86,6 @@ func (c *Client) sendAllBets(sigChan <-chan os.Signal) error {
 	}
 	defer file.Close()
 
-	if err := c.createClientSocket(); err != nil {
-		return err
-	}
-	defer c.conn.Close()
-
-	protocol := NewProtocol(c.conn)
 	scanner := bufio.NewScanner(file)
 	batch := []string{}
 
@@ -127,13 +121,7 @@ func (c *Client) sendAllBets(sigChan <-chan os.Signal) error {
 	return nil
 }
 
-func (c *Client) notifyDone() error {
-	if err := c.createClientSocket(); err != nil {
-		return err
-	}
-	defer c.conn.Close()
-
-	protocol := NewProtocol(c.conn)
+func (c *Client) notifyDone(protocol *Protocol) error {
 	if err := protocol.send(OpDone, c.config.ID); err != nil {
 		return err
 	}
@@ -143,7 +131,7 @@ func (c *Client) notifyDone() error {
 		return err
 	}
 	if opcode != OpOK {
-		return fmt.Errorf("unexpected opcode: %d", opcode)
+		return fmt.Errorf("unexpected opcode after OP_DONE: %d", opcode)
 	}
 	return nil
 }
@@ -187,12 +175,20 @@ func (c *Client) StartClientLoop() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM)
 
-	if err := c.sendAllBets(sigChan); err != nil {
+	if err := c.createClientSocket(); err != nil {
+		log.Errorf("action: connect | result: fail | client_id: %v | error: %v", c.config.ID, err)
+		return
+	}
+	defer c.conn.Close()
+
+	protocol := NewProtocol(c.conn)
+
+	if err := c.sendAllBets(sigChan, protocol); err != nil {
 		log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		return
 	}
 
-	if err := c.notifyDone(); err != nil {
+	if err := c.notifyDone(protocol); err != nil {
 		log.Errorf("action: notify_done | result: fail | client_id: %v | error: %v", c.config.ID, err)
 		return
 	}
